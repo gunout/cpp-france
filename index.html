@@ -1,0 +1,1022 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Comptes des partis politiques — Dashboard v3</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+<style>
+  :root {
+    --bleu: #002395; --blanc: #ffffff; --rouge: #ED2939;
+    --gris: #1a1a1a; --gris-clair: #f4f6fa; --gris-bord: #e2e6ef;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Roboto, sans-serif; background: #f4f6fa; color: var(--gris); padding: 20px; }
+  .container { max-width: 1800px; margin: 0 auto; }
+
+  header {
+    background: linear-gradient(90deg, var(--bleu) 0%, var(--bleu) 33%,
+      var(--blanc) 33%, var(--blanc) 66%, var(--rouge) 66%, var(--rouge) 100%);
+    padding: 5px; border-radius: 14px; box-shadow: 0 8px 24px rgba(0,0,0,0.15); margin-bottom: 20px;
+  }
+  .header-inner { background: white; border-radius: 10px; padding: 20px 28px; text-align: center; }
+  h1 { font-size: 1.7em; background: linear-gradient(90deg, var(--bleu), var(--rouge));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin-bottom: 4px; }
+  .subtitle { color: #666; font-size: 0.85em; }
+
+  .tabs {
+    display: flex; gap: 6px; margin-bottom: 18px;
+    background: white; padding: 6px; border-radius: 12px;
+    box-shadow: 0 3px 12px rgba(0,0,0,0.08); flex-wrap: wrap;
+  }
+  .tab { padding: 10px 16px; border-radius: 8px; cursor: pointer; font-weight: 600;
+    font-size: 0.85em; color: var(--bleu); border: 2px solid transparent;
+    transition: all 0.2s; background: transparent; }
+  .tab:hover { background: var(--gris-clair); }
+  .tab.active { background: var(--bleu); color: white; box-shadow: 0 3px 8px rgba(0,35,149,0.3); }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  .controls {
+    background: white; border-radius: 12px; padding: 14px 18px;
+    box-shadow: 0 3px 12px rgba(0,0,0,0.08); margin-bottom: 18px;
+    display: flex; flex-wrap: wrap; gap: 14px; align-items: center;
+  }
+  .controls label { font-weight: 600; color: var(--bleu); font-size: 0.88em; }
+  .controls select, .controls input[type=range] {
+    padding: 7px 11px; border-radius: 8px; border: 2px solid var(--bleu);
+    font-size: 0.9em; background: white; color: var(--bleu); font-weight: 600;
+  }
+  .controls input[type=range] { flex: 1; min-width: 180px; accent-color: var(--bleu); }
+  .year-display { font-weight: 700; color: var(--rouge); font-size: 1.05em; min-width: 55px; }
+
+  .kpi-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px; margin-bottom: 18px;
+  }
+  .kpi { background: white; border-radius: 10px; padding: 14px;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.07); border-top: 4px solid var(--bleu);
+    transition: transform 0.2s; }
+  .kpi:nth-child(even) { border-top-color: var(--rouge); }
+  .kpi:hover { transform: translateY(-3px); }
+  .kpi-label { font-size: 0.72em; color: #777; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 5px; }
+  .kpi-value { font-size: 1.3em; font-weight: 700; color: var(--bleu); }
+  .kpi:nth-child(even) .kpi-value { color: var(--rouge); }
+  .kpi-unit { font-size: 0.68em; color: #999; }
+
+  .charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(480px, 1fr));
+    gap: 16px; margin-bottom: 18px; }
+  .charts-grid.triple { grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); }
+  .chart-card { background: white; border-radius: 12px; padding: 16px;
+    box-shadow: 0 3px 12px rgba(0,0,0,0.08); border-left: 5px solid var(--bleu); }
+  .chart-card:nth-child(even) { border-left-color: var(--rouge); }
+  .chart-card h3 { font-size: 0.95em; color: var(--bleu); margin-bottom: 12px;
+    padding-bottom: 8px; border-bottom: 2px solid var(--gris-clair); }
+  .chart-card:nth-child(even) h3 { color: var(--rouge); }
+  .chart-wrapper { position: relative; height: 300px; }
+  .chart-wrapper.tall { height: 480px; }
+  .chart-wrapper.small { height: 240px; }
+
+  .parti-checks { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  .parti-checks label { display: flex; align-items: center; gap: 5px;
+    padding: 5px 10px; border-radius: 18px; background: var(--gris-clair);
+    cursor: pointer; font-size: 0.82em; font-weight: 600;
+    border: 2px solid transparent; transition: all 0.2s; }
+  .parti-checks input[type=checkbox] { cursor: pointer; }
+
+  .btn { background: var(--bleu); color: white; border: none;
+    padding: 9px 16px; border-radius: 8px; cursor: pointer;
+    font-weight: 600; font-size: 0.85em; transition: all 0.2s; }
+  .btn:hover { background: #001a6e; transform: translateY(-1px); }
+  .btn.secondary { background: var(--rouge); }
+  .btn.secondary:hover { background: #b81f2e; }
+  .btn.ghost { background: white; color: var(--bleu); border: 2px solid var(--bleu); }
+  .btn.ghost:hover { background: var(--bleu); color: white; }
+
+  .poste-selector { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+  .poste-btn { padding: 7px 12px; border-radius: 8px; border: 2px solid var(--gris-bord);
+    background: white; cursor: pointer; font-size: 0.82em; font-weight: 600;
+    color: #555; transition: all 0.2s; }
+  .poste-btn:hover { border-color: var(--bleu); color: var(--bleu); }
+  .poste-btn.active { background: var(--bleu); border-color: var(--bleu); color: white; }
+
+  .loading, .error { background: white; padding: 40px; border-radius: 12px;
+    text-align: center; font-size: 1.1em; }
+  .error { color: var(--rouge); border-left: 5px solid var(--rouge); }
+
+  footer { text-align: center; color: #888; font-size: 0.82em; padding: 20px; }
+
+  @media (max-width: 768px) {
+    .charts-grid { grid-template-columns: 1fr; }
+    h1 { font-size: 1.2em; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="header-inner">
+      <h1>🇫🇷 Comptes des partis politiques — Dashboard analytique v3</h1>
+      <p class="subtitle">Source : CNCCFP via data.gouv.fr · 2021-2024 · 25+ graphiques</p>
+    </div>
+  </header>
+
+  <div id="loading" class="loading">Chargement des données…</div>
+
+  <div id="app" style="display:none">
+
+    <div class="tabs">
+      <button class="tab active" data-tab="parti">📊 Parti</button>
+      <button class="tab" data-tab="structure">💰 Structure</button>
+      <button class="tab" data-tab="compare">⚖️ Comparaison</button>
+      <button class="tab" data-tab="ratios">📐 Ratios</button>
+      <button class="tab" data-tab="classement">🏆 Classement</button>
+      <button class="tab" data-tab="postes">🔍 Postes</button>
+      <button class="tab" data-tab="bilan">🏦 Bilan</button>
+      <button class="tab" data-tab="export">💾 Export</button>
+    </div>
+
+    <!-- ================= ONGLET 1 : PARTI ================= -->
+    <div class="tab-panel active" id="panel-parti">
+      <div class="controls">
+        <label for="partiSelect">Parti :</label>
+        <select id="partiSelect"></select>
+        <label for="yearRange">Année max :</label>
+        <input type="range" id="yearRange" min="2021" max="2024" value="2024" step="1">
+        <span class="year-display" id="yearDisplay">2024</span>
+      </div>
+      <div class="kpi-grid" id="kpiGrid"></div>
+
+      <div class="charts-grid">
+        <div class="chart-card">
+          <h3>1. 📈 Produits vs Charges (M€)</h3>
+          <div class="chart-wrapper"><canvas id="c01"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>2. 💵 Résultat net (M€)</h3>
+          <div class="chart-wrapper"><canvas id="c02"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>3. 🗳️ Aide publique vs Cotisations (M€)</h3>
+          <div class="chart-wrapper"><canvas id="c03"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>4. 👥 Structure des produits (M€)</h3>
+          <div class="chart-wrapper"><canvas id="c04"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>5. 💸 Structure des charges (M€)</h3>
+          <div class="chart-wrapper"><canvas id="c05"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>6. 🏦 Endettement & fonds propres (M€)</h3>
+          <div class="chart-wrapper"><canvas id="c06"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= ONGLET 2 : STRUCTURE ================= -->
+    <div class="tab-panel" id="panel-structure">
+      <div class="controls">
+        <label for="structParti">Parti :</label>
+        <select id="structParti"></select>
+        <label for="structAnnee">Année :</label>
+        <select id="structAnnee"></select>
+      </div>
+      <div class="charts-grid">
+        <div class="chart-card">
+          <h3>7. 🍩 Répartition produits (donut)</h3>
+          <div class="chart-wrapper"><canvas id="c07"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>8. 🍩 Répartition charges (donut)</h3>
+          <div class="chart-wrapper"><canvas id="c08"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>9. 📊 Produits détaillés par poste (barres)</h3>
+          <div class="chart-wrapper tall"><canvas id="c09"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>10. 📊 Charges détaillées par poste (barres)</h3>
+          <div class="chart-wrapper tall"><canvas id="c10"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= ONGLET 3 : COMPARAISON ================= -->
+    <div class="tab-panel" id="panel-compare">
+      <div class="controls" style="flex-direction:column; align-items:stretch;">
+        <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:12px;">
+          <label>Sélectionnez 2 à 4 partis :</label>
+          <div>
+            <button class="btn ghost" onclick="selectAllCompare()">Aucun</button>
+            <button class="btn" onclick="selectTopCompare()">Top 4</button>
+          </div>
+        </div>
+        <div class="parti-checks" id="partiChecks"></div>
+      </div>
+      <div class="charts-grid">
+        <div class="chart-card">
+          <h3>11. 📈 Produits (M€)</h3>
+          <div class="chart-wrapper"><canvas id="c11"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>12. 📉 Charges (M€)</h3>
+          <div class="chart-wrapper"><canvas id="c12"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>13. 💵 Résultat net (M€)</h3>
+          <div class="chart-wrapper"><canvas id="c13"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>14. 🗳️ Aide publique (M€)</h3>
+          <div class="chart-wrapper"><canvas id="c14"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>15. 👥 Cotisations totales (M€)</h3>
+          <div class="chart-wrapper"><canvas id="c15"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>16. 💰 Dons personnes physiques (M€)</h3>
+          <div class="chart-wrapper"><canvas id="c16"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>17. 🏦 Total dettes (M€)</h3>
+          <div class="chart-wrapper"><canvas id="c17"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>18. 💼 Fonds propres (M€)</h3>
+          <div class="chart-wrapper"><canvas id="c18"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= ONGLET 4 : RATIOS ================= -->
+    <div class="tab-panel" id="panel-ratios">
+      <div class="controls">
+        <label for="ratioParti">Parti :</label>
+        <select id="ratioParti"></select>
+      </div>
+      <div class="charts-grid triple">
+        <div class="chart-card">
+          <h3>19. 📐 Dépendance à l'aide publique (%)</h3>
+          <div class="chart-wrapper"><canvas id="c19"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>20. 📐 Part des salaires dans les charges (%)</h3>
+          <div class="chart-wrapper"><canvas id="c20"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>21. 📐 Part de la communication (%)</h3>
+          <div class="chart-wrapper"><canvas id="c21"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>22. 📐 Ratio dettes / produits (%)</h3>
+          <div class="chart-wrapper"><canvas id="c22"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>23. 📐 Taux de résultat net (%)</h3>
+          <div class="chart-wrapper"><canvas id="c23"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>24. 📐 Part cotisations dans les produits (%)</h3>
+          <div class="chart-wrapper"><canvas id="c24"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= ONGLET 5 : CLASSEMENT ================= -->
+    <div class="tab-panel" id="panel-classement">
+      <div class="controls">
+        <label>Année :</label><select id="clYear"></select>
+        <label>Indicateur :</label>
+        <select id="clMetric">
+          <option value="total_produits">Total produits</option>
+          <option value="total_charges">Total charges</option>
+          <option value="resultat_net">Résultat net</option>
+          <option value="aide_publique_total">Aide publique</option>
+          <option value="cotisations_total">Cotisations</option>
+          <option value="dons_personnes_physiques">Dons personnes physiques</option>
+          <option value="total_dettes">Total dettes</option>
+          <option value="total_fonds_propres">Fonds propres</option>
+          <option value="salaires">Salaires</option>
+          <option value="communication">Communication</option>
+        </select>
+        <label>Top :</label>
+        <select id="clTop">
+          <option value="10">10</option>
+          <option value="20" selected>20</option>
+          <option value="36">Tous</option>
+        </select>
+        <button class="btn" onclick="renderClassement()">🔄</button>
+      </div>
+      <div class="chart-card">
+        <h3>25. 🏆 Classement dynamique</h3>
+        <div class="chart-wrapper tall"><canvas id="c25"></canvas></div>
+      </div>
+    </div>
+
+    <!-- ================= ONGLET 6 : POSTES ================= -->
+    <div class="tab-panel" id="panel-postes">
+      <div class="controls" style="flex-direction:column; align-items:stretch;">
+        <div class="poste-selector" id="posteSelector"></div>
+        <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+          <label>Partis :</label>
+          <div class="parti-checks" id="postePartiChecks" style="margin-top:0;"></div>
+        </div>
+      </div>
+      <div class="charts-grid">
+        <div class="chart-card">
+          <h3>26. 📈 Évolution du poste sélectionné (M€)</h3>
+          <div class="chart-wrapper tall"><canvas id="c26"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>27. 📊 Répartition du poste par parti (dernière année)</h3>
+          <div class="chart-wrapper tall"><canvas id="c27"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= ONGLET 7 : BILAN ================= -->
+    <div class="tab-panel" id="panel-bilan">
+      <div class="controls">
+        <label for="bilanParti">Parti :</label>
+        <select id="bilanParti"></select>
+      </div>
+      <div class="charts-grid">
+        <div class="chart-card">
+          <h3>28. 🏦 Composition des dettes (M€)</h3>
+          <div class="chart-wrapper"><canvas id="c28"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>29. 💼 Fonds propres vs Provisions (M€)</h3>
+          <div class="chart-wrapper"><canvas id="c29"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>30. 📊 Actif vs Passif (M€)</h3>
+          <div class="chart-wrapper"><canvas id="c30"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>31. 💧 Disponibilités vs Dettes fournisseurs (M€)</h3>
+          <div class="chart-wrapper"><canvas id="c31"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= ONGLET 8 : EXPORT ================= -->
+    <div class="tab-panel" id="panel-export">
+      <div class="controls">
+        <label>Périmètre :</label>
+        <select id="expScope">
+          <option value="current">Parti actuel</option>
+          <option value="top">Top 15 prioritaires</option>
+          <option value="all">Tous les partis filtrés</option>
+        </select>
+        <button class="btn" onclick="exportJSON()">💾 JSON</button>
+        <button class="btn secondary" onclick="exportCSV()">📄 CSV</button>
+        <button class="btn ghost" onclick="copyToClipboard()">📋 Copier</button>
+      </div>
+      <div class="chart-card">
+        <h3>👁️ Aperçu</h3>
+        <div id="exportPreview" style="max-height:500px; overflow:auto; font-family:monospace; font-size:0.78em; white-space:pre;"></div>
+      </div>
+    </div>
+
+  </div>
+  <footer>Dashboard v3 · 31 graphiques · Données CNCCFP 2021-2024 · 🇫🇷</footer>
+</div>
+
+<script>
+const BLEU = '#002395', ROUGE = '#ED2939';
+const PALETTE = ['#002395', '#ED2939', '#0055A4', '#E75480', '#FFA500', '#00A650', '#DD0000',
+                 '#800000', '#000000', '#6B8E23', '#FFD700', '#00A0E0', '#B22222', '#1E3A8A', '#8B0000'];
+
+const POSTES = [
+  { key: 'total_produits', label: 'Total produits' },
+  { key: 'total_charges', label: 'Total charges' },
+  { key: 'aide_publique_1', label: 'Aide publique 1' },
+  { key: 'aide_publique_2', label: 'Aide publique 2' },
+  { key: 'cotisations_adherents', label: 'Cotisations adhérents' },
+  { key: 'cotisations_elus', label: 'Cotisations élus' },
+  { key: 'dons_personnes_physiques', label: 'Dons' },
+  { key: 'salaires', label: 'Salaires' },
+  { key: 'charges_sociales', label: 'Charges sociales' },
+  { key: 'communication', label: 'Communication' },
+  { key: 'honoraires', label: 'Honoraires' },
+  { key: 'locations', label: 'Locations' },
+  { key: 'deplacements', label: 'Déplacements' },
+  { key: 'resultat_net', label: 'Résultat net' },
+  { key: 'total_dettes', label: 'Total dettes' },
+  { key: 'total_fonds_propres', label: 'Fonds propres' },
+];
+
+let DATA = null;
+let charts = {};
+let selectedPoste = 'salaires';
+let postePartis = ['40', '910', '401'];
+let comparePartis = ['40', '910', '401', '976'];
+
+const fmtM = (v) => v == null ? '—' : (v / 1e6).toFixed(2) + ' M€';
+const fmtPct = (v) => v == null ? '—' : v.toFixed(1) + ' %';
+
+function getRecord(code, annee) { return DATA.partis[code]?.annees[annee] || null; }
+function anneesParti(code) { return Object.keys(DATA.partis[code]?.annees || {}).map(Number).sort((a,b)=>a-b); }
+function getAidePublique(r) { return (r?.aide_publique_1 || 0) + (r?.aide_publique_2 || 0); }
+function getCotisations(r) { return (r?.cotisations_adherents || 0) + (r?.cotisations_elus || 0); }
+
+// Helper : détruit et recrée un chart
+function makeChart(id, config) {
+  if (charts[id]) charts[id].destroy();
+  charts[id] = new Chart(document.getElementById(id), config);
+}
+
+// =============================================================
+// ONGLET 1 : PARTI
+// =============================================================
+function renderKPI(code, annee) {
+  const r = getRecord(code, annee);
+  if (!r) { document.getElementById('kpiGrid').innerHTML = ''; return; }
+  const aide = getAidePublique(r);
+  const cot = getCotisations(r);
+  const emprunts = (r.emprunts_banques||0) + (r.emprunts_particuliers||0) +
+                   (r.emprunts_particuliers_taux_pref||0) + (r.emprunts_partis||0);
+  document.getElementById('kpiGrid').innerHTML = `
+    <div class="kpi"><div class="kpi-label">Total produits ${annee}</div><div class="kpi-value">${fmtM(r.total_produits)}</div></div>
+    <div class="kpi"><div class="kpi-label">Total charges ${annee}</div><div class="kpi-value">${fmtM(r.total_charges)}</div></div>
+    <div class="kpi"><div class="kpi-label">Résultat net</div><div class="kpi-value" style="color:${(r.resultat_net||0)>=0?BLEU:ROUGE}">${fmtM(r.resultat_net)}</div></div>
+    <div class="kpi"><div class="kpi-label">Aide publique</div><div class="kpi-value">${fmtM(aide)}</div><div class="kpi-unit">${fmtPct(aide/(r.total_produits||1)*100)}</div></div>
+    <div class="kpi"><div class="kpi-label">Cotisations</div><div class="kpi-value">${fmtM(cot)}</div><div class="kpi-unit">${fmtPct(cot/(r.total_produits||1)*100)}</div></div>
+    <div class="kpi"><div class="kpi-label">Encours emprunts</div><div class="kpi-value">${fmtM(emprunts)}</div></div>
+    <div class="kpi"><div class="kpi-label">Fonds propres</div><div class="kpi-value" style="color:${(r.total_fonds_propres||0)>=0?BLEU:ROUGE}">${fmtM(r.total_fonds_propres)}</div></div>
+    <div class="kpi"><div class="kpi-label">Total dettes</div><div class="kpi-value">${fmtM(r.total_dettes)}</div></div>
+  `;
+}
+
+function renderOngletParti(code, maxYear) {
+  const annees = anneesParti(code).filter(a => a <= maxYear);
+  const rev = annees.map(a => (getRecord(code, a)?.total_produits || 0) / 1e6);
+  const exp = annees.map(a => (getRecord(code, a)?.total_charges || 0) / 1e6);
+  const res = annees.map(a => (getRecord(code, a)?.resultat_net || 0) / 1e6);
+  const aide = annees.map(a => getAidePublique(getRecord(code, a)) / 1e6);
+  const cot = annees.map(a => getCotisations(getRecord(code, a)) / 1e6);
+
+  // 1
+  makeChart('c01', { type: 'line',
+    data: { labels: annees, datasets: [
+      { label: 'Produits', data: rev, borderColor: BLEU, backgroundColor: 'rgba(0,35,149,0.15)', fill: true, tension: 0.3, borderWidth: 2 },
+      { label: 'Charges', data: exp, borderColor: ROUGE, backgroundColor: 'rgba(237,41,57,0.15)', fill: true, tension: 0.3, borderWidth: 2 }
+    ]},
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom' } },
+      scales: { y: { title: { display: true, text: 'M€' } } } } });
+
+  // 2
+  makeChart('c02', { type: 'bar',
+    data: { labels: annees, datasets: [{
+      label: 'Résultat net',
+      data: res,
+      backgroundColor: res.map(v => v >= 0 ? BLEU : ROUGE)
+    }]},
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { y: { title: { display: true, text: 'M€' } } } } });
+
+  // 3
+  makeChart('c03', { type: 'line',
+    data: { labels: annees, datasets: [
+      { label: 'Aide publique', data: aide, borderColor: ROUGE, tension: 0.3, borderWidth: 3 },
+      { label: 'Cotisations', data: cot, borderColor: BLEU, tension: 0.3, borderWidth: 3 }
+    ]},
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom' } },
+      scales: { y: { title: { display: true, text: 'M€' } } } } });
+
+  // 4
+  const r4 = getRecord(code, maxYear);
+  if (r4) makeChart('c04', { type: 'doughnut',
+    data: { labels: ['Cot. adhérents', 'Cot. élus', 'Aide pub. 1', 'Aide pub. 2', 'Dons', 'Prestations', 'Autres'],
+      datasets: [{ data: [
+        r4.cotisations_adherents||0, r4.cotisations_elus||0, r4.aide_publique_1||0,
+        r4.aide_publique_2||0, r4.dons_personnes_physiques||0, r4.prestations_candidats||0, r4.autres_produits||0
+      ], backgroundColor: PALETTE }]},
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'right', labels: { boxWidth: 10, font: { size: 10 } } },
+        tooltip: { callbacks: { label: (c) => `${c.label} : ${(c.parsed/1e6).toFixed(2)} M€` } } } } });
+
+  // 5
+  if (r4) makeChart('c05', { type: 'doughnut',
+    data: { labels: ['Salaires', 'Ch. sociales', 'Communication', 'Honoraires', 'Locations', 'Déplacements', 'Achats', 'Impôts'],
+      datasets: [{ data: [
+        r4.salaires||0, r4.charges_sociales||0, r4.communication||0, r4.honoraires||0,
+        r4.locations||0, r4.deplacements||0, r4.autres_achats||0, r4.impots_taxes||0
+      ], backgroundColor: PALETTE }]},
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'right', labels: { boxWidth: 10, font: { size: 10 } } },
+        tooltip: { callbacks: { label: (c) => `${c.label} : ${(c.parsed/1e6).toFixed(2)} M€` } } } } });
+
+  // 6
+  const dettes = annees.map(a => (getRecord(code, a)?.total_dettes || 0) / 1e6);
+  const fonds = annees.map(a => (getRecord(code, a)?.total_fonds_propres || 0) / 1e6);
+  const provisions = annees.map(a => (getRecord(code, a)?.total_provisions || 0) / 1e6);
+  makeChart('c06', { type: 'bar',
+    data: { labels: annees, datasets: [
+      { label: 'Dettes', data: dettes, backgroundColor: ROUGE },
+      { label: 'Fonds propres', data: fonds, backgroundColor: BLEU },
+      { label: 'Provisions', data: provisions, backgroundColor: '#888' }
+    ]},
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom' } },
+      scales: { y: { title: { display: true, text: 'M€' } } } } });
+}
+
+// =============================================================
+// ONGLET 2 : STRUCTURE
+// =============================================================
+function renderOngletStructure() {
+  const code = document.getElementById('structParti').value;
+  const annee = +document.getElementById('structAnnee').value;
+  const r = getRecord(code, annee);
+  if (!r) return;
+
+  const prodLabels = ['Cotisations adhérents', 'Cotisations élus', 'Aide publique 1', 'Aide publique 2',
+                      'Dons personnes physiques', 'Prestations candidats', 'Autres produits'];
+  const prodValues = [r.cotisations_adherents||0, r.cotisations_elus||0, r.aide_publique_1||0,
+                      r.aide_publique_2||0, r.dons_personnes_physiques||0, r.prestations_candidats||0, r.autres_produits||0];
+
+  const charLabels = ['Salaires', 'Charges sociales', 'Communication', 'Honoraires', 'Locations',
+                      'Déplacements', 'Autres achats', 'Impôts', 'Dotations provisions'];
+  const charValues = [r.salaires||0, r.charges_sociales||0, r.communication||0, r.honoraires||0,
+                      r.locations||0, r.deplacements||0, r.autres_achats||0, r.impots_taxes||0, r.dotations_provisions||0];
+
+  // 7
+  makeChart('c07', { type: 'doughnut',
+    data: { labels: prodLabels, datasets: [{ data: prodValues, backgroundColor: PALETTE }]},
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'right', labels: { boxWidth: 10, font: { size: 10 } } },
+        tooltip: { callbacks: { label: (c) => `${c.label} : ${(c.parsed/1e6).toFixed(2)} M€` } } } } });
+
+  // 8
+  makeChart('c08', { type: 'doughnut',
+    data: { labels: charLabels, datasets: [{ data: charValues, backgroundColor: PALETTE.slice().reverse() }]},
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'right', labels: { boxWidth: 10, font: { size: 10 } } },
+        tooltip: { callbacks: { label: (c) => `${c.label} : ${(c.parsed/1e6).toFixed(2)} M€` } } } } });
+
+  // 9
+  makeChart('c09', { type: 'bar',
+    data: { labels: prodLabels, datasets: [{ label: 'Produits', data: prodValues.map(v => v/1e6), backgroundColor: BLEU }]},
+    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false },
+        tooltip: { callbacks: { label: (c) => `${c.parsed.x.toFixed(2)} M€` } } },
+      scales: { x: { title: { display: true, text: 'M€' } } } } });
+
+  // 10
+  makeChart('c10', { type: 'bar',
+    data: { labels: charLabels, datasets: [{ label: 'Charges', data: charValues.map(v => v/1e6), backgroundColor: ROUGE }]},
+    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false },
+        tooltip: { callbacks: { label: (c) => `${c.parsed.x.toFixed(2)} M€` } } },
+      scales: { x: { title: { display: true, text: 'M€' } } } } });
+}
+
+// =============================================================
+// ONGLET 3 : COMPARAISON (8 graphiques)
+// =============================================================
+function renderPartiChecks() {
+  const cont = document.getElementById('partiChecks');
+  cont.innerHTML = '';
+  const codes = Object.keys(DATA.partis).filter(c => DATA.partis[c].prioritaire);
+  codes.sort((a, b) => DATA.partis[a].nom_court.localeCompare(DATA.partis[b].nom_court));
+  codes.forEach(c => {
+    const p = DATA.partis[c];
+    const lbl = document.createElement('label');
+    const actif = comparePartis.includes(c);
+    lbl.style.background = actif ? p.couleur : 'var(--gris-clair)';
+    lbl.style.color = actif ? 'white' : '#333';
+    lbl.innerHTML = `<input type="checkbox" ${actif ? 'checked' : ''}> ${p.nom_court}`;
+    lbl.querySelector('input').addEventListener('change', (e) => {
+      if (e.target.checked) {
+        if (comparePartis.length >= 4) { e.target.checked = false; return; }
+        comparePartis.push(c);
+      } else {
+        comparePartis = comparePartis.filter(x => x !== c);
+      }
+      renderPartiChecks(); renderOngletCompare();
+    });
+    cont.appendChild(lbl);
+  });
+}
+
+function selectAllCompare() { comparePartis = []; renderPartiChecks(); renderOngletCompare(); }
+function selectTopCompare() {
+  const top = Object.keys(DATA.partis).filter(c => DATA.partis[c].prioritaire)
+    .sort((a, b) => (getRecord(b, 2024)?.total_produits || 0) - (getRecord(a, 2024)?.total_produits || 0))
+    .slice(0, 4);
+  comparePartis = top; renderPartiChecks(); renderOngletCompare();
+}
+
+function renderOngletCompare() {
+  const annees = [2021, 2022, 2023, 2024];
+  const metrics = [
+    { id: 'c11', key: 'total_produits', titre: 'Produits' },
+    { id: 'c12', key: 'total_charges', titre: 'Charges' },
+    { id: 'c13', key: 'resultat_net', titre: 'Résultat net' },
+    { id: 'c14', key: 'aide_publique_total', titre: 'Aide publique' },
+    { id: 'c15', key: 'cotisations_total', titre: 'Cotisations' },
+    { id: 'c16', key: 'dons_personnes_physiques', titre: 'Dons' },
+    { id: 'c17', key: 'total_dettes', titre: 'Dettes' },
+    { id: 'c18', key: 'total_fonds_propres', titre: 'Fonds propres' }
+  ];
+  metrics.forEach(m => {
+    makeChart(m.id, { type: 'line',
+      data: { labels: annees, datasets: comparePartis.map(code => {
+        const p = DATA.partis[code];
+        return {
+          label: p.nom_court,
+          data: annees.map(a => {
+            const r = getRecord(code, a);
+            let v = r ? (r[m.key] || 0) : 0;
+            if (m.key === 'aide_publique_total') v = getAidePublique(r);
+            if (m.key === 'cotisations_total') v = getCotisations(r);
+            return v / 1e6;
+          }),
+          borderColor: p.couleur, backgroundColor: p.couleur + '22',
+          tension: 0.3, borderWidth: 3, pointRadius: 5
+        };
+      })},
+      options: { responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom' } },
+        scales: { y: { title: { display: true, text: 'M€' } } } } });
+  });
+}
+
+// =============================================================
+// ONGLET 4 : RATIOS (6 graphiques)
+// =============================================================
+function renderOngletRatios() {
+  const code = document.getElementById('ratioParti').value;
+  const annees = anneesParti(code);
+
+  const ratios = {
+    c19: { titre: 'Dépendance aide publique', calc: (r) => r.total_produits ? getAidePublique(r) / r.total_produits * 100 : 0, couleur: ROUGE },
+    c20: { titre: 'Part salaires', calc: (r) => r.total_charges ? (r.salaires + r.charges_sociales) / r.total_charges * 100 : 0, couleur: BLEU },
+    c21: { titre: 'Part communication', calc: (r) => r.total_charges ? r.communication / r.total_charges * 100 : 0, couleur: '#E75480' },
+    c22: { titre: 'Dettes / produits', calc: (r) => r.total_produits ? r.total_dettes / r.total_produits * 100 : 0, couleur: ROUGE },
+    c23: { titre: 'Taux résultat net', calc: (r) => r.total_produits ? r.resultat_net / r.total_produits * 100 : 0, couleur: BLEU },
+    c24: { titre: 'Part cotisations', calc: (r) => r.total_produits ? getCotisations(r) / r.total_produits * 100 : 0, couleur: '#00A650' }
+  };
+
+  Object.entries(ratios).forEach(([id, cfg]) => {
+    const data = annees.map(a => cfg.calc(getRecord(code, a)));
+    makeChart(id, { type: 'bar',
+      data: { labels: annees, datasets: [{ label: '%', data: data.map(v => +v.toFixed(2)), backgroundColor: cfg.couleur }]},
+      options: { responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false },
+          tooltip: { callbacks: { label: (c) => c.parsed.y.toFixed(2) + ' %' } } },
+        scales: { y: { title: { display: true, text: '%' } } } } });
+  });
+}
+
+// =============================================================
+// ONGLET 5 : CLASSEMENT
+// =============================================================
+function renderClassement() {
+  const annee = +document.getElementById('clYear').value;
+  const metric = document.getElementById('clMetric').value;
+  const topN = +document.getElementById('clTop').value;
+
+  const items = Object.entries(DATA.partis).map(([code, p]) => {
+    const r = p.annees[annee];
+    if (!r) return null;
+    let v;
+    if (metric === 'aide_publique_total') v = getAidePublique(r);
+    else if (metric === 'cotisations_total') v = getCotisations(r);
+    else v = r[metric] || 0;
+    return { code, court: p.nom_court, nom: p.denomination, couleur: p.couleur, value: v };
+  }).filter(Boolean).sort((a, b) => Math.abs(b.value) - Math.abs(a.value)).slice(0, topN);
+
+  makeChart('c25', { type: 'bar',
+    data: {
+      labels: items.map(i => i.court || i.nom.substring(0, 30)),
+      datasets: [{
+        data: items.map(i => i.value / 1e6),
+        backgroundColor: items.map(i => i.couleur),
+        borderWidth: 1, borderColor: '#fff'
+      }]
+    },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      animation: { duration: 800, easing: 'easeOutQuart' },
+      plugins: { legend: { display: false },
+        tooltip: { callbacks: { label: (c) => c.parsed.x.toFixed(2) + ' M€' } } },
+      scales: { x: { title: { display: true, text: 'M€' } },
+                y: { ticks: { autoSkip: false, font: { size: 11 } } } }
+    } });
+}
+
+// =============================================================
+// ONGLET 6 : POSTES
+// =============================================================
+function renderPosteSelector() {
+  const cont = document.getElementById('posteSelector');
+  cont.innerHTML = '';
+  POSTES.forEach(p => {
+    const b = document.createElement('button');
+    b.className = 'poste-btn' + (p.key === selectedPoste ? ' active' : '');
+    b.textContent = p.label;
+    b.onclick = () => { selectedPoste = p.key; renderPosteSelector(); renderOngletPostes(); };
+    cont.appendChild(b);
+  });
+}
+
+function renderPostePartiChecks() {
+  const cont = document.getElementById('postePartiChecks');
+  cont.innerHTML = '';
+  const codes = Object.keys(DATA.partis).filter(c => DATA.partis[c].prioritaire);
+  codes.forEach(c => {
+    const p = DATA.partis[c];
+    const lbl = document.createElement('label');
+    const actif = postePartis.includes(c);
+    lbl.style.background = actif ? p.couleur : 'var(--gris-clair)';
+    lbl.style.color = actif ? 'white' : '#333';
+    lbl.innerHTML = `<input type="checkbox" ${actif ? 'checked' : ''}> ${p.nom_court}`;
+    lbl.querySelector('input').addEventListener('change', (e) => {
+      if (e.target.checked) {
+        if (postePartis.length >= 6) { e.target.checked = false; return; }
+        postePartis.push(c);
+      } else {
+        postePartis = postePartis.filter(x => x !== c);
+      }
+      renderPostePartiChecks(); renderOngletPostes();
+    });
+    cont.appendChild(lbl);
+  });
+}
+
+function renderOngletPostes() {
+  const anneeMax = +document.getElementById('yearRange').value;
+  const annees = [2021, 2022, 2023, 2024].filter(a => a <= anneeMax);
+  const posteLabel = POSTES.find(p => p.key === selectedPoste)?.label || selectedPoste;
+
+  // 26 : évolution
+  makeChart('c26', { type: 'line',
+    data: { labels: annees, datasets: postePartis.map(code => {
+      const p = DATA.partis[code];
+      return {
+        label: p.nom_court,
+        data: annees.map(a => ((getRecord(code, a)?.[selectedPoste]) || 0) / 1e6),
+        borderColor: p.couleur, backgroundColor: p.couleur + '22',
+        tension: 0.3, borderWidth: 3, pointRadius: 5
+      };
+    })},
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom' }, title: { display: true, text: posteLabel } },
+      scales: { y: { title: { display: true, text: 'M€' } } } } });
+
+  // 27 : répartition par parti dernière année
+  const anneeRef = annees[annees.length - 1];
+  const items = postePartis.map(code => ({
+    code,
+    nom: DATA.partis[code].nom_court,
+    couleur: DATA.partis[code].couleur,
+    value: (getRecord(code, anneeRef)?.[selectedPoste]) || 0
+  })).sort((a, b) => b.value - a.value);
+
+  makeChart('c27', { type: 'bar',
+    data: {
+      labels: items.map(i => i.nom),
+      datasets: [{ data: items.map(i => i.value / 1e6), backgroundColor: items.map(i => i.couleur) }]
+    },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false },
+        title: { display: true, text: `${posteLabel} — ${anneeRef}` },
+        tooltip: { callbacks: { label: (c) => c.parsed.x.toFixed(2) + ' M€' } } },
+      scales: { x: { title: { display: true, text: 'M€' } } }
+    } });
+}
+
+// =============================================================
+// ONGLET 7 : BILAN
+// =============================================================
+function renderOngletBilan() {
+  const code = document.getElementById('bilanParti').value;
+  const annees = anneesParti(code);
+
+  // 28 : composition des dettes
+  const catDettes = ['emprunts_banques', 'emprunts_particuliers', 'emprunts_particuliers_taux_pref',
+                     'emprunts_partis', 'dettes_fournisseurs', 'dettes_fiscales_sociales', 'autres_dettes'];
+  const labelsDettes = ['Banques', 'Particuliers', 'Particuliers taux pref', 'Partis',
+                        'Fournisseurs', 'Fiscales/sociales', 'Autres'];
+  makeChart('c28', { type: 'bar',
+    data: { labels: annees, datasets: catDettes.map((k, i) => ({
+      label: labelsDettes[i],
+      data: annees.map(a => (getRecord(code, a)?.[k] || 0) / 1e6),
+      backgroundColor: PALETTE[i % PALETTE.length]
+    }))},
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
+      scales: { x: { stacked: true }, y: { stacked: true, title: { display: true, text: 'M€' } } } } });
+
+  // 29 : fonds propres vs provisions
+  makeChart('c29', { type: 'bar',
+    data: { labels: annees, datasets: [
+      { label: 'Fonds propres', data: annees.map(a => (getRecord(code, a)?.total_fonds_propres||0)/1e6), backgroundColor: BLEU },
+      { label: 'Provisions', data: annees.map(a => (getRecord(code, a)?.total_provisions||0)/1e6), backgroundColor: ROUGE }
+    ]},
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom' } },
+      scales: { y: { title: { display: true, text: 'M€' } } } } });
+
+  // 30 : actif vs passif
+  makeChart('c30', { type: 'bar',
+    data: { labels: annees, datasets: [
+      { label: 'Total actif', data: annees.map(a => (getRecord(code, a)?.total_actif||0)/1e6), backgroundColor: BLEU },
+      { label: 'Total dettes', data: annees.map(a => (getRecord(code, a)?.total_dettes||0)/1e6), backgroundColor: ROUGE }
+    ]},
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom' } },
+      scales: { y: { title: { display: true, text: 'M€' } } } } });
+
+  // 31 : disponibilités vs dettes fournisseurs
+  makeChart('c31', { type: 'line',
+    data: { labels: annees, datasets: [
+      { label: 'Disponibilités', data: annees.map(a => (getRecord(code, a)?.disponibilites||0)/1e6), borderColor: BLEU, tension: 0.3, borderWidth: 3 },
+      { label: 'Dettes fournisseurs', data: annees.map(a => (getRecord(code, a)?.dettes_fournisseurs||0)/1e6), borderColor: ROUGE, tension: 0.3, borderWidth: 3 }
+    ]},
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom' } },
+      scales: { y: { title: { display: true, text: 'M€' } } } } });
+}
+
+// =============================================================
+// ONGLET 8 : EXPORT
+// =============================================================
+function getExportData() {
+  const scope = document.getElementById('expScope').value;
+  const currentCode = document.getElementById('partiSelect').value;
+  let codes;
+  if (scope === 'current') codes = [currentCode];
+  else if (scope === 'top') codes = Object.keys(DATA.partis).filter(c => DATA.partis[c].prioritaire);
+  else codes = Object.keys(DATA.partis);
+  return codes.map(code => {
+    const p = DATA.partis[code];
+    return { code, denomination: p.denomination, nom_court: p.nom_court, annees: p.annees };
+  });
+}
+function renderExportPreview() {
+  const data = getExportData();
+  const str = JSON.stringify(data, null, 2);
+  document.getElementById('exportPreview').textContent =
+    str.substring(0, 5000) + (str.length > 5000 ? '\n… (tronqué)' : '');
+}
+function exportJSON() {
+  const data = getExportData();
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `comptes_partis_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+}
+function exportCSV() {
+  const data = getExportData();
+  const rows = [];
+  const cols = ['code','denomination','annee','total_produits','total_charges','resultat_net',
+                'aide_publique_1','aide_publique_2','cotisations_adherents','cotisations_elus',
+                'dons_personnes_physiques','salaires','charges_sociales','communication','honoraires',
+                'total_dettes','total_fonds_propres'];
+  rows.push(cols.join(';'));
+  data.forEach(p => Object.entries(p.annees).forEach(([a, rec]) => {
+    rows.push(cols.map(c => {
+      if (c === 'code') return p.code;
+      if (c === 'denomination') return `"${p.denomination}"`;
+      if (c === 'annee') return a;
+      return rec[c] != null ? rec[c] : '';
+    }).join(';'));
+  }));
+  const blob = new Blob(['\ufeff' + rows.join('\n')], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `comptes_partis_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+}
+function copyToClipboard() {
+  navigator.clipboard.writeText(JSON.stringify(getExportData(), null, 2))
+    .then(() => alert('✅ Copié')).catch(() => alert('❌ Échec'));
+}
+
+// =============================================================
+// ORCHESTRATION
+// =============================================================
+function refresh() {
+  const code = document.getElementById('partiSelect').value;
+  const maxYear = +document.getElementById('yearRange').value;
+  document.getElementById('yearDisplay').textContent = maxYear;
+  renderKPI(code, maxYear);
+  renderOngletParti(code, maxYear);
+}
+
+function initTabs() {
+  document.querySelectorAll('.tab').forEach(t => {
+    t.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach(x => x.classList.remove('active'));
+      t.classList.add('active');
+      document.getElementById('panel-' + t.dataset.tab).classList.add('active');
+      if (t.dataset.tab === 'structure') renderOngletStructure();
+      if (t.dataset.tab === 'compare') renderOngletCompare();
+      if (t.dataset.tab === 'ratios') renderOngletRatios();
+      if (t.dataset.tab === 'classement') renderClassement();
+      if (t.dataset.tab === 'postes') renderOngletPostes();
+      if (t.dataset.tab === 'bilan') renderOngletBilan();
+      if (t.dataset.tab === 'export') renderExportPreview();
+    });
+  });
+}
+
+async function init() {
+  try {
+    const resp = await fetch('partis_comptes_filtered.json');
+    if (!resp.ok) throw new Error('partis_comptes_filtered.json introuvable');
+    DATA = await resp.json();
+  } catch (e) {
+    document.getElementById('loading').outerHTML =
+      `<div class="error">❌ ${e.message}<br>Lance <code>python3 filter_partis.py</code> puis <code>python3 -m http.server 8080</code>.</div>`;
+    return;
+  }
+
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+
+  // Sélecteurs partis
+  const codes = Object.keys(DATA.partis);
+  const prio = codes.filter(c => DATA.partis[c].prioritaire)
+    .sort((a, b) => DATA.partis[a].nom_court.localeCompare(DATA.partis[b].nom_court));
+  const autres = codes.filter(c => !DATA.partis[c].prioritaire)
+    .sort((a, b) => DATA.partis[a].denomination.localeCompare(DATA.partis[b].denomination));
+
+  const fillSelect = (sel) => {
+    [...prio, ...autres].forEach(c => {
+      const o = document.createElement('option');
+      o.value = c;
+      o.textContent = DATA.partis[c].prioritaire
+        ? `⭐ ${DATA.partis[c].nom_court} — ${DATA.partis[c].denomination}`
+        : DATA.partis[c].denomination;
+      sel.appendChild(o);
+    });
+  };
+  fillSelect(document.getElementById('partiSelect'));
+  fillSelect(document.getElementById('structParti'));
+  fillSelect(document.getElementById('ratioParti'));
+  fillSelect(document.getElementById('bilanParti'));
+
+  const rn = prio.find(c => DATA.partis[c].nom_court === 'RN');
+  if (rn) {
+    document.getElementById('partiSelect').value = rn;
+    document.getElementById('structParti').value = rn;
+    document.getElementById('ratioParti').value = rn;
+    document.getElementById('bilanParti').value = rn;
+  }
+
+  // Années
+  const annees = DATA.annees_disponibles.map(Number).sort((a, b) => a - b);
+  const range = document.getElementById('yearRange');
+  range.min = annees[0]; range.max = annees[annees.length - 1];
+  range.value = annees[annees.length - 1];
+  document.getElementById('yearDisplay').textContent = range.value;
+
+  // Sélecteurs années
+  const structAnnee = document.getElementById('structAnnee');
+  const clYear = document.getElementById('clYear');
+  annees.slice().reverse().forEach(a => {
+    structAnnee.appendChild(Object.assign(document.createElement('option'), { value: a, textContent: a }));
+    clYear.appendChild(Object.assign(document.createElement('option'), { value: a, textContent: a }));
+  });
+  structAnnee.value = annees[annees.length - 1];
+
+  // Listeners
+  range.addEventListener('input', refresh);
+  document.getElementById('partiSelect').addEventListener('change', refresh);
+  document.getElementById('structParti').addEventListener('change', renderOngletStructure);
+  document.getElementById('structAnnee').addEventListener('change', renderOngletStructure);
+  document.getElementById('ratioParti').addEventListener('change', renderOngletRatios);
+  document.getElementById('bilanParti').addEventListener('change', renderOngletBilan);
+  document.getElementById('clYear').addEventListener('change', renderClassement);
+  document.getElementById('clMetric').addEventListener('change', renderClassement);
+  document.getElementById('clTop').addEventListener('change', renderClassement);
+  document.getElementById('expScope').addEventListener('change', renderExportPreview);
+
+  // Init onglets annexes
+  renderPartiChecks();
+  renderPosteSelector();
+  renderPostePartiChecks();
+  initTabs();
+
+  refresh();
+}
+
+init();
+</script>
+</body>
+</html>
