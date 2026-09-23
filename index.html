@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<title>Comptes des partis politiques — Dashboard v3</title>
+<title>Comptes des partis politiques — Dashboard v5 (2008-2024)</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
@@ -117,8 +117,8 @@
 <div class="container">
   <header>
     <div class="header-inner">
-      <h1>🇫🇷 Comptes des partis politiques — Dashboard analytique v3</h1>
-      <p class="subtitle">Source : CNCCFP via data.gouv.fr · 2021-2024 · 25+ graphiques</p>
+      <h1>🇫🇷 Comptes des partis politiques — Dashboard analytique v5</h1>
+      <p class="subtitle">Source : CNCCFP via data.gouv.fr · 2008-2024 · 31 graphiques</p>
     </div>
   </header>
 
@@ -143,7 +143,7 @@
         <label for="partiSelect">Parti :</label>
         <select id="partiSelect"></select>
         <label for="yearRange">Année max :</label>
-        <input type="range" id="yearRange" min="2021" max="2024" value="2024" step="1">
+        <input type="range" id="yearRange" min="2008" max="2024" value="2024" step="1">
         <span class="year-display" id="yearDisplay">2024</span>
       </div>
       <div class="kpi-grid" id="kpiGrid"></div>
@@ -307,7 +307,9 @@
         <select id="clTop">
           <option value="10">10</option>
           <option value="20" selected>20</option>
-          <option value="36">Tous</option>
+          <option value="50">50</option>
+          <option value="200">200</option>
+          <option value="9999">Tous</option>
         </select>
         <button class="btn" onclick="renderClassement()">🔄</button>
       </div>
@@ -384,7 +386,7 @@
     </div>
 
   </div>
-  <footer>Dashboard v3 · 31 graphiques · Données CNCCFP 2021-2024 · 🇫🇷</footer>
+  <footer>Dashboard v5 · 31 graphiques · Données CNCCFP 2008-2024 · 🇫🇷</footer>
 </div>
 
 <script>
@@ -416,6 +418,7 @@ let charts = {};
 let selectedPoste = 'salaires';
 let postePartis = ['40', '910', '401'];
 let comparePartis = ['40', '910', '401', '976'];
+let anneesGlobales = [];
 
 const fmtM = (v) => v == null ? '—' : (v / 1e6).toFixed(2) + ' M€';
 const fmtPct = (v) => v == null ? '—' : v.toFixed(1) + ' %';
@@ -436,11 +439,18 @@ function makeChart(id, config) {
 // =============================================================
 function renderKPI(code, annee) {
   const r = getRecord(code, annee);
-  if (!r) { document.getElementById('kpiGrid').innerHTML = ''; return; }
+  if (!r) {
+    document.getElementById('kpiGrid').innerHTML =
+      `<div class="kpi" style="grid-column:1/-1">
+         <div class="kpi-label">Aucune donnée</div>
+         <div class="kpi-value">—</div>
+         <div class="kpi-unit">Pas de comptes pour ${annee}</div>
+       </div>`;
+    return;
+  }
   const aide = getAidePublique(r);
   const cot = getCotisations(r);
-  const emprunts = (r.emprunts_banques||0) + (r.emprunts_particuliers||0) +
-                   (r.emprunts_particuliers_taux_pref||0) + (r.emprunts_partis||0);
+  const emprunts = (r.emprunts_banques||0) + (r.emprunts_particuliers||0);
   document.getElementById('kpiGrid').innerHTML = `
     <div class="kpi"><div class="kpi-label">Total produits ${annee}</div><div class="kpi-value">${fmtM(r.total_produits)}</div></div>
     <div class="kpi"><div class="kpi-label">Total charges ${annee}</div><div class="kpi-value">${fmtM(r.total_charges)}</div></div>
@@ -455,13 +465,18 @@ function renderKPI(code, annee) {
 
 function renderOngletParti(code, maxYear) {
   const annees = anneesParti(code).filter(a => a <= maxYear);
+  if (annees.length === 0) {
+    ['c01','c02','c03','c04','c05','c06'].forEach(id => {
+      if (charts[id]) { charts[id].destroy(); charts[id] = null; }
+    });
+    return;
+  }
   const rev = annees.map(a => (getRecord(code, a)?.total_produits || 0) / 1e6);
   const exp = annees.map(a => (getRecord(code, a)?.total_charges || 0) / 1e6);
   const res = annees.map(a => (getRecord(code, a)?.resultat_net || 0) / 1e6);
   const aide = annees.map(a => getAidePublique(getRecord(code, a)) / 1e6);
   const cot = annees.map(a => getCotisations(getRecord(code, a)) / 1e6);
 
-  // 1
   makeChart('c01', { type: 'line',
     data: { labels: annees, datasets: [
       { label: 'Produits', data: rev, borderColor: BLEU, backgroundColor: 'rgba(0,35,149,0.15)', fill: true, tension: 0.3, borderWidth: 2 },
@@ -471,7 +486,6 @@ function renderOngletParti(code, maxYear) {
       plugins: { legend: { position: 'bottom' } },
       scales: { y: { title: { display: true, text: 'M€' } } } } });
 
-  // 2
   makeChart('c02', { type: 'bar',
     data: { labels: annees, datasets: [{
       label: 'Résultat net',
@@ -482,7 +496,6 @@ function renderOngletParti(code, maxYear) {
       plugins: { legend: { display: false } },
       scales: { y: { title: { display: true, text: 'M€' } } } } });
 
-  // 3
   makeChart('c03', { type: 'line',
     data: { labels: annees, datasets: [
       { label: 'Aide publique', data: aide, borderColor: ROUGE, tension: 0.3, borderWidth: 3 },
@@ -492,30 +505,29 @@ function renderOngletParti(code, maxYear) {
       plugins: { legend: { position: 'bottom' } },
       scales: { y: { title: { display: true, text: 'M€' } } } } });
 
-  // 4
   const r4 = getRecord(code, maxYear);
   if (r4) makeChart('c04', { type: 'doughnut',
-    data: { labels: ['Cot. adhérents', 'Cot. élus', 'Aide pub. 1', 'Aide pub. 2', 'Dons', 'Prestations', 'Autres'],
+    data: { labels: ['Cot. adhérents', 'Cot. élus', 'Aide pub. 1', 'Aide pub. 2', 'Dons', 'Autres'],
       datasets: [{ data: [
         r4.cotisations_adherents||0, r4.cotisations_elus||0, r4.aide_publique_1||0,
-        r4.aide_publique_2||0, r4.dons_personnes_physiques||0, r4.prestations_candidats||0, r4.autres_produits||0
+        r4.aide_publique_2||0, r4.dons_personnes_physiques||0,
+        (r4.autres_produits||0) + (r4.prestations_candidats||0) + (r4.autres_aides_publiques||0)
       ], backgroundColor: PALETTE }]},
     options: { responsive: true, maintainAspectRatio: false,
       plugins: { legend: { position: 'right', labels: { boxWidth: 10, font: { size: 10 } } },
         tooltip: { callbacks: { label: (c) => `${c.label} : ${(c.parsed/1e6).toFixed(2)} M€` } } } } });
 
-  // 5
   if (r4) makeChart('c05', { type: 'doughnut',
-    data: { labels: ['Salaires', 'Ch. sociales', 'Communication', 'Honoraires', 'Locations', 'Déplacements', 'Achats', 'Impôts'],
+    data: { labels: ['Salaires', 'Ch. sociales', 'Communication', 'Honoraires', 'Locations', 'Déplacements', 'Autres'],
       datasets: [{ data: [
         r4.salaires||0, r4.charges_sociales||0, r4.communication||0, r4.honoraires||0,
-        r4.locations||0, r4.deplacements||0, r4.autres_achats||0, r4.impots_taxes||0
+        r4.locations||0, r4.deplacements||0,
+        (r4.autres_achats||0) + (r4.impots_taxes||0) + (r4.dotations_provisions||0)
       ], backgroundColor: PALETTE }]},
     options: { responsive: true, maintainAspectRatio: false,
       plugins: { legend: { position: 'right', labels: { boxWidth: 10, font: { size: 10 } } },
         tooltip: { callbacks: { label: (c) => `${c.label} : ${(c.parsed/1e6).toFixed(2)} M€` } } } } });
 
-  // 6
   const dettes = annees.map(a => (getRecord(code, a)?.total_dettes || 0) / 1e6);
   const fonds = annees.map(a => (getRecord(code, a)?.total_fonds_propres || 0) / 1e6);
   const provisions = annees.map(a => (getRecord(code, a)?.total_provisions || 0) / 1e6);
@@ -537,33 +549,37 @@ function renderOngletStructure() {
   const code = document.getElementById('structParti').value;
   const annee = +document.getElementById('structAnnee').value;
   const r = getRecord(code, annee);
-  if (!r) return;
+  if (!r) {
+    ['c07','c08','c09','c10'].forEach(id => {
+      if (charts[id]) { charts[id].destroy(); charts[id] = null; }
+    });
+    return;
+  }
 
   const prodLabels = ['Cotisations adhérents', 'Cotisations élus', 'Aide publique 1', 'Aide publique 2',
-                      'Dons personnes physiques', 'Prestations candidats', 'Autres produits'];
+                      'Dons personnes physiques', 'Autres'];
   const prodValues = [r.cotisations_adherents||0, r.cotisations_elus||0, r.aide_publique_1||0,
-                      r.aide_publique_2||0, r.dons_personnes_physiques||0, r.prestations_candidats||0, r.autres_produits||0];
+                      r.aide_publique_2||0, r.dons_personnes_physiques||0,
+                      (r.autres_produits||0) + (r.prestations_candidats||0) + (r.autres_aides_publiques||0)];
 
   const charLabels = ['Salaires', 'Charges sociales', 'Communication', 'Honoraires', 'Locations',
-                      'Déplacements', 'Autres achats', 'Impôts', 'Dotations provisions'];
+                      'Déplacements', 'Autres'];
   const charValues = [r.salaires||0, r.charges_sociales||0, r.communication||0, r.honoraires||0,
-                      r.locations||0, r.deplacements||0, r.autres_achats||0, r.impots_taxes||0, r.dotations_provisions||0];
+                      r.locations||0, r.deplacements||0,
+                      (r.autres_achats||0) + (r.impots_taxes||0) + (r.dotations_provisions||0)];
 
-  // 7
   makeChart('c07', { type: 'doughnut',
     data: { labels: prodLabels, datasets: [{ data: prodValues, backgroundColor: PALETTE }]},
     options: { responsive: true, maintainAspectRatio: false,
       plugins: { legend: { position: 'right', labels: { boxWidth: 10, font: { size: 10 } } },
         tooltip: { callbacks: { label: (c) => `${c.label} : ${(c.parsed/1e6).toFixed(2)} M€` } } } } });
 
-  // 8
   makeChart('c08', { type: 'doughnut',
     data: { labels: charLabels, datasets: [{ data: charValues, backgroundColor: PALETTE.slice().reverse() }]},
     options: { responsive: true, maintainAspectRatio: false,
       plugins: { legend: { position: 'right', labels: { boxWidth: 10, font: { size: 10 } } },
         tooltip: { callbacks: { label: (c) => `${c.label} : ${(c.parsed/1e6).toFixed(2)} M€` } } } } });
 
-  // 9
   makeChart('c09', { type: 'bar',
     data: { labels: prodLabels, datasets: [{ label: 'Produits', data: prodValues.map(v => v/1e6), backgroundColor: BLEU }]},
     options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false,
@@ -571,7 +587,6 @@ function renderOngletStructure() {
         tooltip: { callbacks: { label: (c) => `${c.parsed.x.toFixed(2)} M€` } } },
       scales: { x: { title: { display: true, text: 'M€' } } } } });
 
-  // 10
   makeChart('c10', { type: 'bar',
     data: { labels: charLabels, datasets: [{ label: 'Charges', data: charValues.map(v => v/1e6), backgroundColor: ROUGE }]},
     options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false,
@@ -611,13 +626,16 @@ function renderPartiChecks() {
 function selectAllCompare() { comparePartis = []; renderPartiChecks(); renderOngletCompare(); }
 function selectTopCompare() {
   const top = Object.keys(DATA.partis).filter(c => DATA.partis[c].prioritaire)
-    .sort((a, b) => (getRecord(b, 2024)?.total_produits || 0) - (getRecord(a, 2024)?.total_produits || 0))
+    .sort((a, b) => {
+      const anneeMax = anneesGlobales[anneesGlobales.length - 1];
+      return (getRecord(b, anneeMax)?.total_produits || 0) - (getRecord(a, anneeMax)?.total_produits || 0);
+    })
     .slice(0, 4);
   comparePartis = top; renderPartiChecks(); renderOngletCompare();
 }
 
 function renderOngletCompare() {
-  const annees = [2021, 2022, 2023, 2024];
+  const annees = anneesGlobales;
   const metrics = [
     { id: 'c11', key: 'total_produits', titre: 'Produits' },
     { id: 'c12', key: 'total_charges', titre: 'Charges' },
@@ -642,7 +660,7 @@ function renderOngletCompare() {
             return v / 1e6;
           }),
           borderColor: p.couleur, backgroundColor: p.couleur + '22',
-          tension: 0.3, borderWidth: 3, pointRadius: 5
+          tension: 0.3, borderWidth: 3, pointRadius: 4
         };
       })},
       options: { responsive: true, maintainAspectRatio: false,
@@ -659,12 +677,12 @@ function renderOngletRatios() {
   const annees = anneesParti(code);
 
   const ratios = {
-    c19: { titre: 'Dépendance aide publique', calc: (r) => r.total_produits ? getAidePublique(r) / r.total_produits * 100 : 0, couleur: ROUGE },
-    c20: { titre: 'Part salaires', calc: (r) => r.total_charges ? (r.salaires + r.charges_sociales) / r.total_charges * 100 : 0, couleur: BLEU },
-    c21: { titre: 'Part communication', calc: (r) => r.total_charges ? r.communication / r.total_charges * 100 : 0, couleur: '#E75480' },
-    c22: { titre: 'Dettes / produits', calc: (r) => r.total_produits ? r.total_dettes / r.total_produits * 100 : 0, couleur: ROUGE },
-    c23: { titre: 'Taux résultat net', calc: (r) => r.total_produits ? r.resultat_net / r.total_produits * 100 : 0, couleur: BLEU },
-    c24: { titre: 'Part cotisations', calc: (r) => r.total_produits ? getCotisations(r) / r.total_produits * 100 : 0, couleur: '#00A650' }
+    c19: { calc: (r) => r.total_produits ? getAidePublique(r) / r.total_produits * 100 : 0, couleur: ROUGE },
+    c20: { calc: (r) => r.total_charges ? (r.salaires + r.charges_sociales) / r.total_charges * 100 : 0, couleur: BLEU },
+    c21: { calc: (r) => r.total_charges ? r.communication / r.total_charges * 100 : 0, couleur: '#E75480' },
+    c22: { calc: (r) => r.total_produits ? r.total_dettes / r.total_produits * 100 : 0, couleur: ROUGE },
+    c23: { calc: (r) => r.total_produits ? r.resultat_net / r.total_produits * 100 : 0, couleur: BLEU },
+    c24: { calc: (r) => r.total_produits ? getCotisations(r) / r.total_produits * 100 : 0, couleur: '#00A650' }
   };
 
   Object.entries(ratios).forEach(([id, cfg]) => {
@@ -711,7 +729,7 @@ function renderClassement() {
       plugins: { legend: { display: false },
         tooltip: { callbacks: { label: (c) => c.parsed.x.toFixed(2) + ' M€' } } },
       scales: { x: { title: { display: true, text: 'M€' } },
-                y: { ticks: { autoSkip: false, font: { size: 11 } } } }
+                y: { ticks: { autoSkip: false, font: { size: 10 } } } }
     } });
 }
 
@@ -756,10 +774,9 @@ function renderPostePartiChecks() {
 
 function renderOngletPostes() {
   const anneeMax = +document.getElementById('yearRange').value;
-  const annees = [2021, 2022, 2023, 2024].filter(a => a <= anneeMax);
+  const annees = anneesGlobales.filter(a => a <= anneeMax);
   const posteLabel = POSTES.find(p => p.key === selectedPoste)?.label || selectedPoste;
 
-  // 26 : évolution
   makeChart('c26', { type: 'line',
     data: { labels: annees, datasets: postePartis.map(code => {
       const p = DATA.partis[code];
@@ -767,14 +784,13 @@ function renderOngletPostes() {
         label: p.nom_court,
         data: annees.map(a => ((getRecord(code, a)?.[selectedPoste]) || 0) / 1e6),
         borderColor: p.couleur, backgroundColor: p.couleur + '22',
-        tension: 0.3, borderWidth: 3, pointRadius: 5
+        tension: 0.3, borderWidth: 3, pointRadius: 4
       };
     })},
     options: { responsive: true, maintainAspectRatio: false,
       plugins: { legend: { position: 'bottom' }, title: { display: true, text: posteLabel } },
       scales: { y: { title: { display: true, text: 'M€' } } } } });
 
-  // 27 : répartition par parti dernière année
   const anneeRef = annees[annees.length - 1];
   const items = postePartis.map(code => ({
     code,
@@ -804,11 +820,10 @@ function renderOngletBilan() {
   const code = document.getElementById('bilanParti').value;
   const annees = anneesParti(code);
 
-  // 28 : composition des dettes
-  const catDettes = ['emprunts_banques', 'emprunts_particuliers', 'emprunts_particuliers_taux_pref',
-                     'emprunts_partis', 'dettes_fournisseurs', 'dettes_fiscales_sociales', 'autres_dettes'];
-  const labelsDettes = ['Banques', 'Particuliers', 'Particuliers taux pref', 'Partis',
-                        'Fournisseurs', 'Fiscales/sociales', 'Autres'];
+  // 28 : composition des dettes (adapté aux données disponibles)
+  const catDettes = ['emprunts_banques', 'emprunts_particuliers',
+                     'dettes_fournisseurs', 'dettes_fiscales_sociales', 'autres_dettes'];
+  const labelsDettes = ['Banques', 'Particuliers', 'Fournisseurs', 'Fiscales/sociales', 'Autres'];
   makeChart('c28', { type: 'bar',
     data: { labels: annees, datasets: catDettes.map((k, i) => ({
       label: labelsDettes[i],
@@ -819,7 +834,6 @@ function renderOngletBilan() {
       plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
       scales: { x: { stacked: true }, y: { stacked: true, title: { display: true, text: 'M€' } } } } });
 
-  // 29 : fonds propres vs provisions
   makeChart('c29', { type: 'bar',
     data: { labels: annees, datasets: [
       { label: 'Fonds propres', data: annees.map(a => (getRecord(code, a)?.total_fonds_propres||0)/1e6), backgroundColor: BLEU },
@@ -829,7 +843,6 @@ function renderOngletBilan() {
       plugins: { legend: { position: 'bottom' } },
       scales: { y: { title: { display: true, text: 'M€' } } } } });
 
-  // 30 : actif vs passif
   makeChart('c30', { type: 'bar',
     data: { labels: annees, datasets: [
       { label: 'Total actif', data: annees.map(a => (getRecord(code, a)?.total_actif||0)/1e6), backgroundColor: BLEU },
@@ -839,7 +852,6 @@ function renderOngletBilan() {
       plugins: { legend: { position: 'bottom' } },
       scales: { y: { title: { display: true, text: 'M€' } } } } });
 
-  // 31 : disponibilités vs dettes fournisseurs
   makeChart('c31', { type: 'line',
     data: { labels: annees, datasets: [
       { label: 'Disponibilités', data: annees.map(a => (getRecord(code, a)?.disponibilites||0)/1e6), borderColor: BLEU, tension: 0.3, borderWidth: 3 },
@@ -942,12 +954,17 @@ async function init() {
     DATA = await resp.json();
   } catch (e) {
     document.getElementById('loading').outerHTML =
-      `<div class="error">❌ ${e.message}<br>Lance <code>python3 filter_partis.py</code> puis <code>python3 -m http.server 8080</code>.</div>`;
+      `<div class="error">❌ ${e.message}<br>Lance <code>python3 fetch.py</code> puis <code>python3 -m http.server 8080</code>.</div>`;
     return;
   }
 
   document.getElementById('loading').style.display = 'none';
   document.getElementById('app').style.display = 'block';
+
+  // Années disponibles (déjà triées dans le JSON)
+  anneesGlobales = DATA.annees_disponibles.map(Number);
+  const anneeMin = anneesGlobales[0];
+  const anneeMax = anneesGlobales[anneesGlobales.length - 1];
 
   // Sélecteurs partis
   const codes = Object.keys(DATA.partis);
@@ -979,21 +996,22 @@ async function init() {
     document.getElementById('bilanParti').value = rn;
   }
 
-  // Années
-  const annees = DATA.annees_disponibles.map(Number).sort((a, b) => a - b);
+  // Slider d'année
   const range = document.getElementById('yearRange');
-  range.min = annees[0]; range.max = annees[annees.length - 1];
-  range.value = annees[annees.length - 1];
+  range.min = anneeMin;
+  range.max = anneeMax;
+  range.value = anneeMax;
   document.getElementById('yearDisplay').textContent = range.value;
 
-  // Sélecteurs années
+  // Sélecteurs années (structure + classement)
   const structAnnee = document.getElementById('structAnnee');
   const clYear = document.getElementById('clYear');
-  annees.slice().reverse().forEach(a => {
+  anneesGlobales.slice().reverse().forEach(a => {
     structAnnee.appendChild(Object.assign(document.createElement('option'), { value: a, textContent: a }));
     clYear.appendChild(Object.assign(document.createElement('option'), { value: a, textContent: a }));
   });
-  structAnnee.value = annees[annees.length - 1];
+  structAnnee.value = anneeMax;
+  clYear.value = anneeMax;
 
   // Listeners
   range.addEventListener('input', refresh);
