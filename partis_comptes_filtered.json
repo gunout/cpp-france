@@ -1492,7 +1492,7 @@
       }
     },
     "40": {
-      "denomination": "FRONT NATIONAL",
+      "denomination": "RASSEMBLEMENT NATIONAL",
       "nom_court": "RN",
       "couleur": "#1a1a1a",
       "prioritaire": true,
@@ -5037,9 +5037,9 @@
     },
     "60": {
       "denomination": "PARTI COMMUNISTE FRANÇAIS",
-      "nom_court": "PARTI COMMUNISTE FRA",
-      "couleur": "#888888",
-      "prioritaire": false,
+      "nom_court": "PCF",
+      "couleur": "#DD0000",
+      "prioritaire": true,
       "annees": {
         "2008": {
           "total_fonds_propres": 0.0,
@@ -8165,9 +8165,9 @@
     },
     "76": {
       "denomination": "PARTI SOCIALISTE",
-      "nom_court": "PARTI SOCIALISTE",
-      "couleur": "#888888",
-      "prioritaire": false,
+      "nom_court": "PS",
+      "couleur": "#E75480",
+      "prioritaire": true,
       "annees": {
         "2008": {
           "total_fonds_propres": 0.0,
@@ -8717,8 +8717,8 @@
     },
     "77": {
       "denomination": "CHASSE PÊCHE NATURE TRADITIONS",
-      "nom_court": "PCF",
-      "couleur": "#DD0000",
+      "nom_court": "CPNT",
+      "couleur": "#6B8E23",
       "prioritaire": true,
       "annees": {
         "2008": {
@@ -52556,9 +52556,9 @@
       }
     },
     "401": {
-      "denomination": "UMP",
-      "nom_court": "PS",
-      "couleur": "#E75480",
+      "denomination": "UNION POUR UN MOUVEMENT POPULAIRE",
+      "nom_court": "UMP",
+      "couleur": "#0066CC",
       "prioritaire": true,
       "annees": {
         "2008": {
@@ -72133,9 +72133,9 @@
     },
     "529": {
       "denomination": "MOUVEMENT DÉMOCRATE",
-      "nom_court": "MOUVEMENT DÉMOCRATE",
-      "couleur": "#888888",
-      "prioritaire": false,
+      "nom_court": "MoDem",
+      "couleur": "#FFA500",
+      "prioritaire": true,
       "annees": {
         "2008": {
           "total_fonds_propres": 0.0,
